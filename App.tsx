@@ -246,23 +246,118 @@ function App() {
             </TouchableOpacity>
           ) : (
             <>
-              <View style={styles.sessionContainer}>
-                <Text style={[styles.sessionTitle, {color: isDarkMode ? '#fff' : '#000'}]}>
-                  Connected!
+              <View style={styles.walletDetailsContainer}>
+                <Text style={[styles.walletDetailsTitle, {color: isDarkMode ? '#fff' : '#000'}]}>
+                  💼 Wallet Connected
                 </Text>
-                <Text style={[styles.sessionText, {color: isDarkMode ? '#ccc' : '#666'}]}>
-                  Topic: {session.topic.substring(0, 20)}...
-                </Text>
+
+                {/* Wallet Address */}
                 {session.namespaces?.eip155?.accounts?.[0] && (
-                  <Text style={[styles.sessionText, {color: isDarkMode ? '#ccc' : '#666'}]}>
-                    Account: {session.namespaces.eip155.accounts[0].split(':')[2]?.substring(0, 10)}...
+                  <View style={styles.detailCard}>
+                    <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                      Address
+                    </Text>
+                    <Text style={[styles.detailValue, {color: isDarkMode ? '#fff' : '#000'}]}>
+                      {session.namespaces.eip155.accounts[0].split(':')[2]}
+                    </Text>
+                    <Text style={[styles.detailValueShort, {color: isDarkMode ? '#3b82f6' : '#2563eb'}]}>
+                      {session.namespaces.eip155.accounts[0].split(':')[2]?.substring(0, 6)}...
+                      {session.namespaces.eip155.accounts[0].split(':')[2]?.substring(
+                        session.namespaces.eip155.accounts[0].split(':')[2].length - 4
+                      )}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Chain Information */}
+                {session.namespaces?.eip155?.chains && (
+                  <View style={styles.detailCard}>
+                    <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                      Network
+                    </Text>
+                    <Text style={[styles.detailValue, {color: isDarkMode ? '#fff' : '#000'}]}>
+                      {session.namespaces.eip155.chains.map(chain => {
+                        const chainId = chain.split(':')[1];
+                        const chainNames: {[key: string]: string} = {
+                          '1': 'Ethereum Mainnet',
+                          '5': 'Goerli Testnet',
+                          '137': 'Polygon',
+                          '80001': 'Mumbai Testnet',
+                          '56': 'BNB Smart Chain',
+                          '43114': 'Avalanche',
+                          '42161': 'Arbitrum',
+                          '10': 'Optimism',
+                        };
+                        return chainNames[chainId] || `Chain ${chainId}`;
+                      }).join(', ')}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Peer Metadata (Wallet Info) */}
+                {session.peer?.metadata && (
+                  <View style={styles.detailCard}>
+                    <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                      Connected Wallet
+                    </Text>
+                    <Text style={[styles.detailValue, {color: isDarkMode ? '#fff' : '#000'}]}>
+                      {session.peer.metadata.name}
+                    </Text>
+                    {session.peer.metadata.description && (
+                      <Text style={[styles.detailDescription, {color: isDarkMode ? '#999' : '#666'}]}>
+                        {session.peer.metadata.description}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Session Topic */}
+                <View style={styles.detailCard}>
+                  <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                    Session ID
                   </Text>
+                  <Text style={[styles.detailValueSmall, {color: isDarkMode ? '#ccc' : '#666'}]}>
+                    {session.topic}
+                  </Text>
+                </View>
+
+                {/* Supported Methods */}
+                {session.namespaces?.eip155?.methods && (
+                  <View style={styles.detailCard}>
+                    <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                      Supported Methods
+                    </Text>
+                    <View style={styles.methodsContainer}>
+                      {session.namespaces.eip155.methods.map((method, index) => (
+                        <View key={index} style={styles.methodBadge}>
+                          <Text style={styles.methodText}>{method}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Events */}
+                {session.namespaces?.eip155?.events && (
+                  <View style={styles.detailCard}>
+                    <Text style={[styles.detailLabel, {color: isDarkMode ? '#999' : '#666'}]}>
+                      Subscribed Events
+                    </Text>
+                    <View style={styles.methodsContainer}>
+                      {session.namespaces.eip155.events.map((event, index) => (
+                        <View key={index} style={[styles.methodBadge, styles.eventBadge]}>
+                          <Text style={styles.methodText}>{event}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
                 )}
               </View>
+
               <TouchableOpacity
                 style={[styles.button, styles.disconnectButton]}
                 onPress={handleDisconnect}>
-                <Text style={styles.buttonText}>Disconnect</Text>
+                <Text style={styles.buttonText}>Disconnect Wallet</Text>
               </TouchableOpacity>
             </>
           )}
@@ -355,6 +450,71 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginVertical: 4,
     textAlign: 'center',
+  },
+  walletDetailsContainer: {
+    width: '100%',
+    marginVertical: 20,
+  },
+  walletDetailsTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detailCard: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6',
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  detailValueShort: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  detailValueSmall: {
+    fontSize: 10,
+    fontFamily: 'Courier',
+    lineHeight: 16,
+  },
+  detailDescription: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  methodsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 8,
+  },
+  methodBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  eventBadge: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+  },
+  methodText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
   },
   infoContainer: {
     marginTop: 40,
