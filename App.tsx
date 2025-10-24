@@ -15,11 +15,13 @@ import {
   useColorScheme,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import 'react-native-get-random-values';
 import '@walletconnect/react-native-compat';
 import {SignClient} from '@walletconnect/sign-client';
 import type {SignClientTypes} from '@walletconnect/types';
+import WalletModal from './WalletModal';
 
 const PROJECT_ID = 'b5f59b62f46c8f9f155e7221f936a629';
 
@@ -28,7 +30,10 @@ function App() {
   const [status, setStatus] = useState('Initializing...');
   const [wcUri, setWcUri] = useState('');
   const [session, setSession] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const signClient = useRef<SignClient | null>(null);
+  const pendingApproval = useRef<any>(null);
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? '#1a1a1a' : '#f3f4f6',
@@ -82,6 +87,7 @@ function App() {
     }
   };
 
+
   const handleConnect = async () => {
     try {
       if (!signClient.current) {
@@ -103,30 +109,87 @@ function App() {
 
       if (uri) {
         setWcUri(uri);
-        setStatus(`Connection URI generated! Opening wallet...`);
-        
-        // Open the URI with the wallet app
-        // For testing, this will try to open with any compatible wallet
-        const supported = await Linking.canOpenURL(uri);
-        if (supported) {
-          await Linking.openURL(uri);
-        } else {
-          Alert.alert(
-            'No Wallet Found',
-            `Please install a WalletConnect compatible wallet or scan this URI manually:\n\n${uri}`,
-            [{text: 'OK'}]
-          );
-        }
-
-        // Wait for session approval
-        const sessionData = await approval();
-        setSession(sessionData);
-        setStatus('✅ Connected successfully!');
+        pendingApproval.current = approval;
+        setModalVisible(true);
+        setStatus('Select a wallet to connect');
       }
     } catch (error) {
       console.error('Connection error:', error);
-      setStatus(`❌ Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(
+        `❌ Connection failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
     }
+  };
+
+  const handleWalletSelect = async (wallet: any) => {
+    try {
+      setModalVisible(false);
+
+      if (wallet.installed) {
+        // Wallet is installed, open it directly
+        setStatus(`Opening ${wallet.name}...`);
+        const walletUri = `${wallet.scheme.replace('://', '')}://wc?uri=${encodeURIComponent(wcUri)}`;
+        
+        const canOpen = await Linking.canOpenURL(walletUri);
+        if (canOpen) {
+          await Linking.openURL(walletUri);
+          setStatus(`Please approve the connection in ${wallet.name}`);
+        } else {
+          // Fallback to regular WC URI
+          await Linking.openURL(wcUri);
+          setStatus('Please approve the connection in your wallet app');
+        }
+      } else {
+        // Wallet not installed, redirect to store
+        const storeUrl = Platform.OS === 'ios' ? wallet.iosAppStore : wallet.androidPlayStore;
+        Alert.alert(
+          `${wallet.name} Not Installed`,
+          `${wallet.name} is not installed. Would you like to install it?`,
+          [
+            {
+              text: 'Install',
+              onPress: () => {
+                Linking.openURL(storeUrl);
+                setStatus(`Please install ${wallet.name} and try connecting again`);
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setStatus('Connection cancelled'),
+            },
+          ]
+        );
+        return;
+      }
+
+      // Wait for session approval
+      if (pendingApproval.current) {
+        const sessionData = await pendingApproval.current();
+        setSession(sessionData);
+        setStatus('✅ Connected successfully!');
+        pendingApproval.current = null;
+      }
+    } catch (error) {
+      console.error('Wallet connection error:', error);
+      setStatus(
+        `❌ Connection failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  };
+
+  const handleShowQRCode = () => {
+    setModalVisible(false);
+    setShowQRCode(true);
+    Alert.alert(
+      'Scan QR Code',
+      `Scan this URI with your wallet app:\n\n${wcUri}`,
+      [{text: 'OK', onPress: () => setShowQRCode(false)}]
+    );
   };
 
   const handleDisconnect = async () => {
@@ -216,6 +279,13 @@ function App() {
           </View>
         </View>
       </ScrollView>
+      
+      <WalletModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSelectWallet={handleWalletSelect}
+        onShowQRCode={handleShowQRCode}
+      />
     </SafeAreaView>
   );
 }
