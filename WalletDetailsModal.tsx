@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {
   Modal,
   View,
@@ -9,11 +9,16 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import SendModal from './SendModal';
+import {useWeb3} from './hooks/useWeb3';
 
 interface WalletDetailsModalProps {
   visible: boolean;
   onClose: () => void;
   address: string;
+  signClient: any;
+  session: any;
   onDisconnect: () => void;
 }
 
@@ -21,49 +26,19 @@ export default function WalletDetailsModal({
   visible,
   onClose,
   address,
+  signClient,
+  session,
   onDisconnect,
 }: WalletDetailsModalProps) {
-  const [balance, setBalance] = useState<string>('0.000');
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [sendModalVisible, setSendModalVisible] = useState(false);
   const isDarkMode = useColorScheme() === 'dark';
-
-  useEffect(() => {
-    if (visible && address) {
-      fetchBalance();
-    }
-  }, [visible, address]);
-
-  const fetchBalance = async () => {
-    setIsLoadingBalance(true);
-    try {
-      // Fetch ETH balance from Ethereum JSON-RPC
-      const response = await fetch('https://cloudflare-eth.com', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_getBalance',
-          params: [address, 'latest'],
-          id: 1,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.result) {
-        // Convert from Wei to ETH
-        const balanceWei = parseInt(data.result, 16);
-        const balanceEth = (balanceWei / 1e18).toFixed(4);
-        setBalance(balanceEth);
-      }
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-      setBalance('0.000');
-    } finally {
-      setIsLoadingBalance(false);
-    }
-  };
+  
+  // Use our custom Web3 hook for all blockchain interactions
+  const {balance, isLoading, sendTransaction, fetchBalance} = useWeb3(
+    address,
+    signClient,
+    session
+  );
 
   const getShortAddress = () => {
     if (!address) return '';
@@ -77,11 +52,47 @@ export default function WalletDetailsModal({
     return colors[index];
   };
 
-  const handleAction = (action: string) => {
+  // Copy address to clipboard
+  const handleCopyAddress = () => {
+    Clipboard.setString(address);
+    Alert.alert('Copied!', 'Address copied to clipboard');
+  };
+
+  // Handle different actions
+  const handleFundWallet = () => {
     Alert.alert(
-      action,
-      `${action} feature will be implemented here`,
+      'Fund Wallet',
+      'You can fund your wallet by:\n\n1. Transferring from another wallet\n2. Using a crypto exchange\n3. Buying with credit card (via exchanges)',
       [{text: 'OK'}]
+    );
+  };
+
+  const handleSwap = () => {
+    Alert.alert(
+      'Swap Tokens',
+      'Swap functionality coming soon!\n\nYou can use external DEXs like:\n• Uniswap\n• 1inch\n• SushiSwap',
+      [{text: 'OK'}]
+    );
+  };
+
+  const handleSend = () => {
+    setSendModalVisible(true);
+  };
+
+  const handleActivity = async () => {
+    Alert.alert(
+      'Transaction History',
+      `View your transactions on Etherscan`,
+      [
+        {text: 'Cancel'},
+        {
+          text: 'Open Etherscan',
+          onPress: () => {
+            // You can open Etherscan here using Linking
+            Alert.alert('Info', `Etherscan: https://etherscan.io/address/${address}`);
+          },
+        },
+      ]
     );
   };
 
@@ -142,15 +153,19 @@ export default function WalletDetailsModal({
           </View>
 
           {/* Address */}
-          <View style={styles.addressContainer}>
+          <TouchableOpacity 
+            style={styles.addressContainer}
+            onPress={handleCopyAddress}
+            activeOpacity={0.7}>
             <Text style={[styles.address, {color: isDarkMode ? '#fff' : '#000'}]}>
               🦊 {getShortAddress()}
             </Text>
-          </View>
+            <Text style={styles.copyHint}>Tap to copy</Text>
+          </TouchableOpacity>
 
           {/* Balance */}
           <View style={styles.balanceContainer}>
-            {isLoadingBalance ? (
+            {isLoading ? (
               <ActivityIndicator size="small" color="#3b82f6" />
             ) : (
               <>
@@ -171,7 +186,7 @@ export default function WalletDetailsModal({
                 styles.actionButton,
                 {backgroundColor: isDarkMode ? '#3a3a3a' : '#f5f5f5'},
               ]}
-              onPress={() => handleAction('Fund wallet')}>
+              onPress={handleFundWallet}>
               <Text style={styles.actionIcon}>💵</Text>
               <Text style={[styles.actionText, {color: isDarkMode ? '#fff' : '#000'}]}>
                 Fund wallet
@@ -184,7 +199,7 @@ export default function WalletDetailsModal({
                 styles.actionButton,
                 {backgroundColor: isDarkMode ? '#3a3a3a' : '#f5f5f5'},
               ]}
-              onPress={() => handleAction('Swap')}>
+              onPress={handleSwap}>
               <Text style={styles.actionIcon}>🔄</Text>
               <Text style={[styles.actionText, {color: isDarkMode ? '#fff' : '#000'}]}>
                 Swap
@@ -197,7 +212,7 @@ export default function WalletDetailsModal({
                 styles.actionButton,
                 {backgroundColor: isDarkMode ? '#3a3a3a' : '#f5f5f5'},
               ]}
-              onPress={() => handleAction('Send')}>
+              onPress={handleSend}>
               <Text style={styles.actionIcon}>📤</Text>
               <Text style={[styles.actionText, {color: isDarkMode ? '#fff' : '#000'}]}>
                 Send
@@ -210,7 +225,7 @@ export default function WalletDetailsModal({
                 styles.actionButton,
                 {backgroundColor: isDarkMode ? '#3a3a3a' : '#f5f5f5'},
               ]}
-              onPress={() => handleAction('Activity')}>
+              onPress={handleActivity}>
               <Text style={styles.actionIcon}>📊</Text>
               <Text style={[styles.actionText, {color: isDarkMode ? '#fff' : '#000'}]}>
                 Activity
@@ -230,6 +245,14 @@ export default function WalletDetailsModal({
           </View>
         </View>
       </View>
+      
+      {/* Send Transaction Modal */}
+      <SendModal
+        visible={sendModalVisible}
+        onClose={() => setSendModalVisible(false)}
+        onSend={sendTransaction}
+        balance={balance}
+      />
     </Modal>
   );
 }
@@ -294,10 +317,16 @@ const styles = StyleSheet.create({
   },
   addressContainer: {
     marginBottom: 24,
+    alignItems: 'center',
   },
   address: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  copyHint: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
   },
   balanceContainer: {
     flexDirection: 'row',

@@ -301,6 +301,8 @@ function App() {
           visible={walletDetailsVisible}
           onClose={() => setWalletDetailsVisible(false)}
           address={session.namespaces.eip155.accounts[0].split(':')[2]}
+          signClient={signClient.current}
+          session={session}
           onDisconnect={handleDisconnect}
         />
       )}
